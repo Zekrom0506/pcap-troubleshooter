@@ -107,7 +107,7 @@ def make_tcp_retransmissions():
     builder = cb.CaptureBuilder()
     add_background_traffic(builder, 52000)
 
-    # File download where segments 5 and 12 are lost and sent again.
+    # File download where segments 5, 12 and 17 are lost and sent again.
     download = cb.TcpConversation(builder, LAPTOP_MAC, LAPTOP_IP, 52100, HOME_ROUTER_MAC, CDN_SERVER_IP, 443,
                                   client_isn=700000, server_isn=900000)
     download.handshake()
@@ -115,7 +115,7 @@ def make_tcp_retransmissions():
     download.server_acks()
 
     segment_size = 1400
-    lost_segments = [5, 12]
+    lost_segments = [5, 12, 17]
     for number in range(1, 21):
         start_seq = download.server_seq
         data = bytes([65 + number % 26]) * segment_size
