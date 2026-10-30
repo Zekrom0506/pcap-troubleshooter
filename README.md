@@ -17,7 +17,9 @@ Built with **Python** and **Scapy**, and checked against **Wireshark** (`tshark`
 
 Every issue gets a severity (`ERROR`, `WARNING`, `INFO`), a plain-English explanation with the likely cause, the list of frames involved, and a Wireshark filter such as `frame.number in {6 8 10 12}`.
 
-The tool also avoids common false alarms: it ignores mDNS/LLMNR, TCP keep-alives and Ethernet padding, recognises traceroute probes, and lowers the severity of anything that happened in the last few seconds of a capture (the reply may simply not have been captured).
+The tool also avoids common false alarms found on real networks: it tells out-of-order packets apart from retransmissions (using the same rules as Wireshark), ignores mDNS/LLMNR, keep-alives and Ethernet padding, recognises traceroute probes and late DNS replies, knows when a DHCP reply could not have been visible in the capture, and lowers the severity of anything in the last few seconds of a capture.
+
+**Tested on my own network:** on a 44,000-packet capture of my home Wi-Fi, the tool flagged 97% of the data retransmissions Wireshark flags, with only 5 extra (details in [`docs/how_it_works.md`](docs/how_it_works.md#tested-on-my-own-network)).
 
 ## Quick start
 
@@ -123,7 +125,7 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-52 tests: unit tests for each check using hand-built packets, plus end-to-end tests that run the tool on every sample capture and compare the results with what Wireshark reports (for example, the retransmission frames match `tcp.analysis.retransmission` exactly).
+59 tests: unit tests for each check using hand-built packets, plus end-to-end tests that run the tool on every sample capture and compare the results with what Wireshark reports (for example, the retransmission frames match Wireshark's `tcp.analysis.retransmission` exactly).
 
 ## Project layout
 

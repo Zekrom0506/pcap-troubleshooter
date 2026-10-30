@@ -41,4 +41,7 @@ echo ""
 echo "Running the troubleshooter..."
 cd "$PROJECT_DIR"
 python3 troubleshoot.py "$OUTPUT_FILE" -f html -o "${OUTPUT_FILE%.pcap}_report.html" || true
-python3 troubleshoot.py "$OUTPUT_FILE" || true
+# Full details (including INFO) go in the HTML report; the terminal shows warnings and errors.
+python3 troubleshoot.py "$OUTPUT_FILE" --min-severity WARNING || true
+echo ""
+echo "Full report: ${OUTPUT_FILE%.pcap}_report.html"
