@@ -11,14 +11,23 @@ often remembered as "DORA":
 
 All four messages share the same transaction ID (xid), so we group by it and
 report any exchange that stopped part way through.
+
+One catch on real networks (especially Wi-Fi): unless the client sets the
+"broadcast" flag, the server sends OFFER and ACK straight to the client, so a
+capture taken on a different computer never sees them. We only call a missing
+reply an ERROR when it should have been visible in this capture.
 """
 
 from scapy.layers.dhcp import BOOTP, DHCP
+from scapy.layers.l2 import Ether
 
 from pcap_troubleshooter.checks import helpers
 from pcap_troubleshooter.models import Issue, ERROR, WARNING, INFO
 
 CHECK_NAME = "DHCP"
+
+# Bit in the BOOTP "flags" field asking the server to broadcast its reply.
+BROADCAST_FLAG = 0x8000
 
 DISCOVER = 1
 OFFER = 2
@@ -44,6 +53,7 @@ class DhcpExchange:
         self.frames_by_type = {}   # message type -> list of frames
         self.all_frames = []
         self.offered_addresses = []
+        self.wants_broadcast_reply = False  # client set the BOOTP broadcast flag
 
     def add(self, message_type, frame):
         if message_type not in self.frames_by_type:
@@ -105,12 +115,43 @@ def collect_exchanges(frames):
         if message_type == OFFER:
             exchange.offered_addresses.append(bootp.yiaddr)
 
+        is_from_client = (bootp.op == 1)
+        if is_from_client and (int(bootp.flags) & BROADCAST_FLAG) != 0:
+            exchange.wants_broadcast_reply = True
+
     return list(exchanges.values())
+
+
+def unicast_destinations(frames):
+    """Every MAC address that some frame in the capture was sent directly to."""
+    destinations = set()
+    for frame in frames:
+        if frame.packet.haslayer(Ether):
+            destinations.add(frame.packet[Ether].dst.lower())
+    destinations.discard("ff:ff:ff:ff:ff:ff")
+    return destinations
+
+
+def reply_would_be_visible(exchange, mac_addresses_reached):
+    """
+    Could this capture have seen the server's reply?
+    Yes if the client asked for a broadcast reply, or if this capture does see
+    frames sent directly to the client (so it is on the client's path).
+    """
+    if exchange.wants_broadcast_reply:
+        return True
+    return exchange.client_mac in mac_addresses_reached
+
+
+NOT_VISIBLE_NOTE = ("Note: this client did not ask for a broadcast reply and this capture never sees"
+                    " traffic sent directly to it, so the server's reply may just not be visible from"
+                    " here (common on Wi-Fi). Capture on the client itself to be sure.")
 
 
 def find_issues(frames, capture_end):
     """Return Issues for DHCP exchanges that did not finish."""
     issues = []
+    mac_addresses_reached = unicast_destinations(frames)
 
     for exchange in collect_exchanges(frames):
         client = "client " + exchange.client_mac + " (xid " + exchange.id_text() + ")"
@@ -140,6 +181,17 @@ def find_issues(frames, capture_end):
             details = [
                 "The client sent DECLINE, which means it found the offered address already in use.",
                 "Likely cause: a device with a static IP inside the DHCP pool (look for ARP conflicts).",
+            ]
+
+        elif exchange.has(DISCOVER) and not exchange.has(OFFER) and exchange.has(REQUEST):
+            # The client went on to send REQUEST, so it DID get an offer: we just did not capture it.
+            if exchange.has(ACK):
+                continue
+            severity = INFO
+            summary = "DHCP offer and acknowledgement not captured for " + client
+            details = [
+                "The client sent DISCOVER and then REQUEST, so it received an OFFER that is not in this capture.",
+                "The server most likely replied directly to the client (unicast).",
             ]
 
         elif exchange.has(DISCOVER) and not exchange.has(OFFER):
@@ -172,6 +224,11 @@ def find_issues(frames, capture_end):
 
         if severity is None:
             continue
+
+        server_replied = exchange.has(OFFER) or exchange.has(ACK) or exchange.has(NAK)
+        if severity == ERROR and not server_replied and not reply_would_be_visible(exchange, mac_addresses_reached):
+            severity = INFO
+            details.append(NOT_VISIBLE_NOTE)
 
         # A single message right at the end of the capture may just be cut off.
         if cut_off and len(exchange.all_frames) == 1:
