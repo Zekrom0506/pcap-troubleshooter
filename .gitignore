@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+reports/
+.DS_Store
+
+# Real captures may contain private data - keep them out of git
+captures/my_network/*
+!captures/my_network/README.md
