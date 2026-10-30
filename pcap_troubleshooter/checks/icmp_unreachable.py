@@ -64,12 +64,15 @@ class IcmpGroup:
         self.is_time_exceeded = is_time_exceeded
         self.frames = []
         self.looks_like_traceroute = True
+        self.is_late_reply = False
+        self.service_port = None
 
 
 def describe_original_packet(packet, is_ipv6):
     """
     Look inside the ICMP message at the copy of the original packet.
-    Return (original source ip, original destination ip, "target text", destination port or None).
+    Return (original source ip, original destination ip, "target text",
+            source port or None, destination port or None).
     """
     if is_ipv6:
         inner_ip_class, inner_tcp_class, inner_udp_class = IPerror6, TCPerror6, UDPerror6
@@ -77,20 +80,41 @@ def describe_original_packet(packet, is_ipv6):
         inner_ip_class, inner_tcp_class, inner_udp_class = IPerror, TCPerror, UDPerror
 
     if not packet.haslayer(inner_ip_class):
-        return "?", "?", "unknown destination", None
+        return "?", "?", "unknown destination", None, None
 
     inner_ip = packet[inner_ip_class]
     target = inner_ip.dst
+    source_port = None
     port = None
 
     if packet.haslayer(inner_tcp_class):
+        source_port = int(packet[inner_tcp_class].sport)
         port = int(packet[inner_tcp_class].dport)
         target = helpers.format_endpoint(inner_ip.dst, port) + "/tcp"
     elif packet.haslayer(inner_udp_class):
+        source_port = int(packet[inner_udp_class].sport)
         port = int(packet[inner_udp_class].dport)
         target = helpers.format_endpoint(inner_ip.dst, port) + "/udp"
 
-    return inner_ip.src, inner_ip.dst, target, port
+    return inner_ip.src, inner_ip.dst, target, source_port, port
+
+
+def is_late_reply(kind_name, source_port, destination_port):
+    """
+    True if a "port unreachable" was caused by a reply that came back too late.
+
+    Example: your computer asks two DNS servers the same question, uses the
+    first answer and closes the socket. When the second answer (from port 53
+    to a temporary high port) arrives, the computer rejects it with "port
+    unreachable". That is normal, not a fault.
+    """
+    if "Port unreachable" not in kind_name:
+        return False
+    if source_port is None or destination_port is None:
+        return False
+    came_from_a_service = source_port < 1024
+    went_to_a_temporary_port = destination_port >= 1024
+    return came_from_a_service and went_to_a_temporary_port
 
 
 def classify(packet):
@@ -137,7 +161,15 @@ def find_issues(frames, capture_end):
             continue
         reporter = addresses[0]
 
-        original_source, original_host, original_target, port = describe_original_packet(packet, is_ipv6)
+        original_source, original_host, original_target, source_port, port = \
+            describe_original_packet(packet, is_ipv6)
+
+        late_reply = is_late_reply(kind_name, source_port, port)
+        if late_reply:
+            # Group all late replies from one server together, whatever the port.
+            kind_name = "Late reply rejected"
+            severity = INFO
+            original_target = original_host
 
         if is_time_exceeded:
             # For TTL problems group by destination host only, not by port,
@@ -151,6 +183,8 @@ def find_issues(frames, capture_end):
             group = IcmpGroup(reporter, kind_name, cause, severity,
                               original_source, original_target, is_time_exceeded)
             groups[key] = group
+            group.is_late_reply = late_reply
+            group.service_port = source_port
         group.frames.append(frame)
 
         if port is None or port < TRACEROUTE_FIRST_PORT or port > TRACEROUTE_LAST_PORT:
@@ -160,6 +194,20 @@ def find_issues(frames, capture_end):
     for group in groups.values():
         count = len(group.frames)
         severity = group.severity
+
+        if group.is_late_reply:
+            summary = (group.reporter + " rejected " + str(count) + " late reply(s) from "
+                       + group.original_source + " (port " + str(group.service_port) + ")")
+            details = [
+                group.original_source + " answered from port " + str(group.service_port)
+                + " after " + group.reporter + " had already stopped waiting, so "
+                + group.reporter + " sent back ICMP 'port unreachable'.",
+                "This is normal: apps often ask two servers at once (for example the IPv4 and IPv6"
+                + " DNS server) and close the socket after the first answer. No action needed.",
+            ]
+            issues.append(Issue(check=CHECK_NAME, severity=INFO, summary=summary, details=details,
+                                frame_numbers=helpers.frame_numbers_of(group.frames)))
+            continue
 
         if group.is_time_exceeded:
             if group.looks_like_traceroute:
