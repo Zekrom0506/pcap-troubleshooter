@@ -66,12 +66,12 @@ def test_tcp_handshake_capture():
 
 
 def test_tcp_retransmission_capture_matches_wireshark():
-    # Wireshark (tcp.analysis.retransmission) flags frames 34, 48 and 69-72 in this file.
+    # Wireshark (tcp.analysis.retransmission) flags frames 34, 48, 60 and 73-76 in this file.
     result = analyze_file(capture("basic", "tcp_retransmissions.pcap"))
     frames = []
     for issue in result.issues:
         frames.extend(issue.frame_numbers)
-    assert sorted(frames) == [34, 48, 69, 70, 71, 72]
+    assert sorted(frames) == [34, 48, 60, 73, 74, 75, 76]
     assert checks_and_severities(capture("basic", "tcp_retransmissions.pcap")) == [
         ("TCP Retransmissions", ERROR), ("TCP Retransmissions", WARNING)]
 

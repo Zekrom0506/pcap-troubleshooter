@@ -114,7 +114,46 @@ def test_retransmitted_segment_is_found():
     issues = run_check(tcp_retransmissions, packets)
     assert len(issues) == 1
     assert issues[0].frame_numbers == [3]
-    assert issues[0].severity == WARNING  # 1 of 4 = 25 %
+    assert issues[0].severity == INFO  # a single retransmission is only INFO
+
+
+def test_three_retransmissions_at_high_rate_is_warning():
+    data = b"x" * 100
+    packets = []
+    for number in range(6):
+        packets.append(tcp(SERVER, CLIENT, 80, 40000, "PA", seq=1000 + number * 100, ack=1, data=data))
+    for number in range(3):
+        packets.append(tcp(SERVER, CLIENT, 80, 40000, "PA", seq=1000 + number * 100, ack=1, data=data))
+    issues = run_check(tcp_retransmissions, packets)
+    assert issues[0].severity == WARNING
+    assert issues[0].frame_numbers == [7, 8, 9]
+
+
+def test_out_of_order_segment_is_not_a_retransmission():
+    data = b"x" * 100
+    packets = [
+        tcp(SERVER, CLIENT, 80, 40000, "PA", seq=1000, ack=1, data=data),
+        tcp(SERVER, CLIENT, 80, 40000, "PA", seq=1200, ack=1, data=data),  # overtook the next one
+        tcp(SERVER, CLIENT, 80, 40000, "PA", seq=1100, ack=1, data=data),  # arrives 1 ms later
+    ]
+    frames = []
+    for index, packet in enumerate(packets):
+        frames.append(Frame(number=index + 1, time=1000.0 + index * 0.001, packet=Ether(bytes(packet))))
+    assert tcp_retransmissions.find_issues(frames, 2000.0) == []
+
+
+def test_resend_of_acknowledged_data_is_a_retransmission_even_if_quick():
+    data = b"x" * 100
+    packets = [
+        tcp(SERVER, CLIENT, 80, 40000, "PA", seq=1000, ack=1, data=data),
+        tcp(CLIENT, SERVER, 40000, 80, "A", seq=1, ack=1100),               # client got it
+        tcp(SERVER, CLIENT, 80, 40000, "PA", seq=1000, ack=1, data=data),  # sent again anyway
+    ]
+    frames = []
+    for index, packet in enumerate(packets):
+        frames.append(Frame(number=index + 1, time=1000.0 + index * 0.001, packet=Ether(bytes(packet))))
+    issues = tcp_retransmissions.find_issues(frames, 2000.0)
+    assert issues[0].frame_numbers == [3]
 
 
 def test_segment_sent_many_times_is_error():
@@ -198,13 +237,13 @@ def test_mdns_is_ignored():
 CLIENT_MAC = "aa:bb:cc:00:00:01"
 
 
-def dhcp(kind, xid=0x1234, from_server=False):
+def dhcp(kind, xid=0x1234, from_server=False, broadcast_flag=0x8000):
     if from_server:
         return (Ether() / IP(src="10.0.0.1", dst="255.255.255.255") / UDP(sport=67, dport=68)
                 / BOOTP(op=2, xid=xid, yiaddr="10.0.0.50", chaddr=mac2str(CLIENT_MAC))
                 / DHCP(options=[("message-type", kind), "end"]))
     return (Ether() / IP(src="0.0.0.0", dst="255.255.255.255") / UDP(sport=68, dport=67)
-            / BOOTP(op=1, xid=xid, chaddr=mac2str(CLIENT_MAC))
+            / BOOTP(op=1, xid=xid, chaddr=mac2str(CLIENT_MAC), flags=broadcast_flag)
             / DHCP(options=[("message-type", kind), "end"]))
 
 
@@ -216,6 +255,7 @@ def test_full_dora_is_fine():
 def test_discover_without_offer_is_error():
     issues = run_check(dhcp_exchanges, [dhcp("discover"), dhcp("discover")])
     assert len(issues) == 1
+    assert issues[0].severity == ERROR
     assert "No DHCP server answered" in issues[0].summary
     assert CLIENT_MAC in issues[0].summary
 
@@ -233,6 +273,18 @@ def test_request_without_ack_is_error():
 def test_nak_is_error():
     issues = run_check(dhcp_exchanges, [dhcp("request"), dhcp("nak", from_server=True)])
     assert "NAK" in issues[0].summary
+
+
+def test_missing_reply_to_other_device_without_broadcast_flag_is_only_info():
+    # Server replies would go straight to this client, which this capture never sees.
+    issues = run_check(dhcp_exchanges, [dhcp("request", broadcast_flag=0), dhcp("request", broadcast_flag=0)])
+    assert issues[0].severity == INFO
+
+
+def test_discover_then_request_means_offer_was_not_captured():
+    issues = run_check(dhcp_exchanges, [dhcp("discover", broadcast_flag=0), dhcp("request", broadcast_flag=0)])
+    assert issues[0].severity == INFO
+    assert "not captured" in issues[0].summary
 
 
 def test_lease_renewal_is_fine():
@@ -308,6 +360,27 @@ def test_traceroute_time_exceeded_is_info_but_loop_is_warning():
         by_target[issue.summary.split()[-1]] = issue.severity
     assert by_target[SERVER] == INFO
     assert by_target["172.16.5.5"] == WARNING
+
+
+def test_late_dns_reply_rejected_by_own_host_is_info():
+    # A DNS answer (from port 53) that arrived after the app had stopped waiting.
+    late_answer = IP(src="10.0.0.53", dst=CLIENT) / UDP(sport=53, dport=55123)
+    issues = run_check(icmp_unreachable, [
+        Ether() / IP(src=CLIENT, dst="10.0.0.53") / ICMP(type=3, code=3) / Raw(load=bytes(late_answer)[:28]),
+    ])
+    assert issues[0].severity == INFO
+    assert "late reply" in issues[0].summary
+
+
+def test_dns_unanswered_by_one_server_but_answered_by_another_is_info():
+    packets = [
+        dns_query(7, "example.com", server="10.0.0.53"),
+        dns_query(8, "example.com", server="10.0.0.54", src_port=33334),
+        dns_answer(8, "example.com", server="10.0.0.54", src_port=33334),
+    ]
+    issues = run_check(dns_queries, packets)
+    assert len(issues) == 1
+    assert issues[0].severity == INFO
 
 
 def test_echo_reply_is_not_reported():
