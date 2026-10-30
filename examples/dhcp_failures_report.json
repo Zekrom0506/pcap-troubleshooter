@@ -1,0 +1,83 @@
+{
+  "file": "captures/basic/dhcp_failures.pcap",
+  "packets": 36,
+  "start_time": 1793181600.3,
+  "end_time": 1793181636.8915,
+  "protocol_counts": {
+    "TCP": 12,
+    "UDP": 20,
+    "DNS": 2,
+    "DHCP": 18,
+    "ARP": 2,
+    "ICMP": 2
+  },
+  "summary": {
+    "errors": 3,
+    "warnings": 1,
+    "info": 0
+  },
+  "issues": [
+    {
+      "check": "DHCP",
+      "severity": "ERROR",
+      "summary": "No DHCP server answered client 50:02:91:ab:cd:01 (xid 0x22220002)",
+      "details": [
+        "The client broadcast 4 DISCOVER message(s) and got no OFFER.",
+        "Likely cause: no DHCP server on this network/VLAN, a missing or broken DHCP relay (ip helper-address) on the router, or the address pool is exhausted.",
+        "Messages seen: DISCOVER -> DISCOVER -> DISCOVER -> DISCOVER"
+      ],
+      "frames": [
+        5,
+        6,
+        7,
+        8
+      ],
+      "wireshark_filter": "frame.number in {5 6 7 8}"
+    },
+    {
+      "check": "DHCP",
+      "severity": "ERROR",
+      "summary": "DHCP request never acknowledged for client d0:81:7a:12:34:56 (xid 0x44440004)",
+      "details": [
+        "The client sent 2 REQUEST message(s) and got no ACK.",
+        "Likely cause: the server is unreachable (renewals go straight to the server) or the server stopped responding mid-exchange.",
+        "Messages seen: REQUEST -> REQUEST"
+      ],
+      "frames": [
+        11,
+        12
+      ],
+      "wireshark_filter": "frame.number in {11 12}"
+    },
+    {
+      "check": "DHCP",
+      "severity": "ERROR",
+      "summary": "DHCP server refused request (NAK) from client 8c:85:90:77:66:55 (xid 0x55550005)",
+      "details": [
+        "The server answered the REQUEST with NAK.",
+        "Likely cause: the client asked for an address from a different subnet (moved networks) or the address is no longer valid.",
+        "Messages seen: REQUEST -> NAK"
+      ],
+      "frames": [
+        13,
+        14
+      ],
+      "wireshark_filter": "frame.number in {13 14}"
+    },
+    {
+      "check": "DHCP",
+      "severity": "WARNING",
+      "summary": "DHCP offer was never requested by client a4:83:e7:bb:00:31 (xid 0x33330003)",
+      "details": [
+        "The server offered 192.168.1.31 but the client never sent a REQUEST.",
+        "Likely cause: the OFFER did not reach the client (relay or VLAN problem on the way back), or the client picked a different server's offer.",
+        "Messages seen: DISCOVER -> OFFER"
+      ],
+      "frames": [
+        9,
+        10
+      ],
+      "wireshark_filter": "frame.number in {9 10}"
+    }
+  ]
+}

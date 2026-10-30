@@ -1,0 +1,101 @@
+<!doctype html><html lang='en'><head><meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Capture Report - missing_route.pcapng</title>
+<style>
+:root { --bg:#f7f7f5; --card:#ffffff; --text:#1d1d1b; --muted:#6b6b66; --line:#e3e3de;
+        --error:#c0392b; --warning:#b9770e; --info:#2e6da4; --ok:#2e7d32; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#161615; --card:#21211f; --text:#ecece8; --muted:#a3a39c; --line:#363632;
+          --error:#ef6f61; --warning:#e9a94b; --info:#6fa8dc; --ok:#7cc47f; }
+}
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--text);
+       font:15px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width:960px; margin:0 auto; padding:32px 16px 64px; }
+h1 { font-size:24px; margin:0 0 4px; }
+h2 { font-size:18px; margin:32px 0 12px; }
+.meta { color:var(--muted); margin-bottom:24px; }
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; }
+.tile { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:12px 16px; }
+.tile .n { font-size:28px; font-weight:600; }
+.tile.error .n { color:var(--error); } .tile.warning .n { color:var(--warning); } .tile.info .n { color:var(--info); }
+table { width:100%; border-collapse:collapse; background:var(--card); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+td, th { text-align:left; padding:8px 12px; border-bottom:1px solid var(--line); }
+tr:last-child td { border-bottom:none; }
+.ok { color:var(--ok); }
+.issue { background:var(--card); border:1px solid var(--line); border-left:4px solid var(--line);
+         border-radius:8px; padding:12px 16px; margin-bottom:12px; }
+.issue.ERROR { border-left-color:var(--error); } .issue.WARNING { border-left-color:var(--warning); }
+.issue.INFO { border-left-color:var(--info); }
+.badge { font-size:12px; font-weight:600; padding:2px 8px; border-radius:4px; margin-right:8px; color:#fff; }
+.badge.ERROR { background:var(--error); } .badge.WARNING { background:var(--warning); } .badge.INFO { background:var(--info); }
+.check { color:var(--muted); font-size:13px; }
+.summary { font-weight:600; margin:6px 0; }
+ul { margin:6px 0; padding-left:20px; }
+code { display:block; background:var(--bg); border:1px solid var(--line); border-radius:4px;
+       padding:6px 8px; font-size:13px; overflow-x:auto; white-space:pre; }
+.frames { color:var(--muted); font-size:13px; }
+</style></head><body><main>
+<h1>Packet Capture Troubleshooting Report</h1>
+<div class='meta'>missing_route.pcapng · 24 packets · 2026-10-28 10:00:00 → 2026-10-28 10:00:12 (12.1 s)</div>
+<div class='tiles'>
+<div class='tile error'><div class='n'>5</div>Errors</div>
+<div class='tile warning'><div class='n'>0</div>Warnings</div>
+<div class='tile info'><div class='n'>0</div>Info</div>
+</div>
+<h2>Checks</h2><table><tr><th>Check</th><th>Result</th></tr>
+<tr><td>TCP Handshake</td><td>1 issue(s)</td></tr>
+<tr><td>TCP Retransmissions</td><td><span class='ok'>OK</span></td></tr>
+<tr><td>DNS</td><td>1 issue(s)</td></tr>
+<tr><td>DHCP</td><td><span class='ok'>OK</span></td></tr>
+<tr><td>ARP Conflict</td><td><span class='ok'>OK</span></td></tr>
+<tr><td>ICMP</td><td>3 issue(s)</td></tr>
+</table>
+<p class='frames'>Packets per protocol: TCP 3 · UDP 2 · DNS 2 · DHCP 0 · ARP 2 · ICMP 17</p>
+<h2>Issues</h2>
+<div class='issue ERROR'>
+<span class='badge ERROR'>ERROR</span>
+<span class='check'>ICMP</span>
+<div class='summary'>Network unreachable: 10.0.12.2 reports 192.168.30.10</div><ul>
+<li>10.0.12.2 sent 4 ICMP &#x27;Network unreachable&#x27; message(s) about traffic from 192.168.10.10 to 192.168.30.10.</li>
+<li>Likely cause: a router has no route to the destination network (missing or wrong route).</li>
+</ul><div class='frames'>Frames: 6, 8, 10, 12</div>
+<div class='frames'>Wireshark filter:</div><code>frame.number in {6 8 10 12}</code>
+</div>
+<div class='issue ERROR'>
+<span class='badge ERROR'>ERROR</span>
+<span class='check'>DNS</span>
+<div class='summary'>Unanswered DNS query: A srv.lab.local. (server 192.168.30.53)</div><ul>
+<li>192.168.10.10 asked DNS server 192.168.30.53 2 time(s) and never got an answer.</li>
+<li>Likely cause: the DNS server is down or unreachable, UDP port 53 is blocked, or the client is pointed at the wrong DNS server.</li>
+</ul><div class='frames'>Frames: 13, 15</div>
+<div class='frames'>Wireshark filter:</div><code>frame.number in {13 15}</code>
+</div>
+<div class='issue ERROR'>
+<span class='badge ERROR'>ERROR</span>
+<span class='check'>ICMP</span>
+<div class='summary'>Network unreachable: 10.0.12.2 reports 192.168.30.53:53/udp</div><ul>
+<li>10.0.12.2 sent 2 ICMP &#x27;Network unreachable&#x27; message(s) about traffic from 192.168.10.10 to 192.168.30.53:53/udp.</li>
+<li>Likely cause: a router has no route to the destination network (missing or wrong route).</li>
+</ul><div class='frames'>Frames: 14, 16</div>
+<div class='frames'>Wireshark filter:</div><code>frame.number in {14 16}</code>
+</div>
+<div class='issue ERROR'>
+<span class='badge ERROR'>ERROR</span>
+<span class='check'>TCP Handshake</span>
+<div class='summary'>SYN rejected by router 10.0.12.2: 192.168.10.10:41500 -&gt; 192.168.30.10:80</div><ul>
+<li>The client sent 3 SYN packet(s); router 10.0.12.2 answered with 3 ICMP &#x27;destination unreachable&#x27; message(s) instead of the server replying.</li>
+<li>See the matching ICMP issue for the exact reason (no route, ACL, host down).</li>
+</ul><div class='frames'>Frames: 17, 18, 19, 20, 21, 22</div>
+<div class='frames'>Wireshark filter:</div><code>frame.number in {17 18 19 20 21 22}</code>
+</div>
+<div class='issue ERROR'>
+<span class='badge ERROR'>ERROR</span>
+<span class='check'>ICMP</span>
+<div class='summary'>Network unreachable: 10.0.12.2 reports 192.168.30.10:80/tcp</div><ul>
+<li>10.0.12.2 sent 3 ICMP &#x27;Network unreachable&#x27; message(s) about traffic from 192.168.10.10 to 192.168.30.10:80/tcp.</li>
+<li>Likely cause: a router has no route to the destination network (missing or wrong route).</li>
+</ul><div class='frames'>Frames: 18, 20, 22</div>
+<div class='frames'>Wireshark filter:</div><code>frame.number in {18 20 22}</code>
+</div>
+</main></body></html>

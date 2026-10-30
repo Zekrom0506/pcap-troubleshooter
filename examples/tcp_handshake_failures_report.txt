@@ -1,0 +1,40 @@
+========================================================================
+PACKET CAPTURE TROUBLESHOOTING REPORT
+========================================================================
+File:      captures/basic/tcp_handshake_failures.pcap
+Packets:   40
+Captured:  2026-10-28 10:00:00  ->  2026-10-28 10:00:13  (13.5 s)
+Protocols: TCP=34  UDP=2  DNS=2  DHCP=0  ARP=2  ICMP=2
+
+SUMMARY
+------------------------------------------------------------------------
+  Errors: 2   Warnings: 1   Info: 0
+
+  TCP Handshake         3 issue(s)
+  TCP Retransmissions   OK
+  DNS                   OK
+  DHCP                  OK
+  ARP Conflict          OK
+  ICMP                  OK
+
+ISSUES
+------------------------------------------------------------------------
+
+#1 [ERROR] TCP Handshake: No response to SYN: 192.168.1.23:51200 -> 203.0.113.50:443
+    The client sent 4 SYN packet(s) and never got a SYN-ACK or RST back.
+    Likely cause: the server is down, unreachable, or a firewall is silently dropping the packets.
+    The client kept retrying for 7.0 seconds.
+    Frames: 19, 20, 21, 22
+    Wireshark filter: frame.number in {19 20 21 22}
+
+#2 [ERROR] TCP Handshake: Connection refused: 192.168.1.23:51201 -> 192.168.1.20:8080
+    The client sent 1 SYN packet(s) and the server answered with RST.
+    Likely cause: no service is listening on port 8080, or a firewall is rejecting the connection.
+    Frames: 23, 24
+    Wireshark filter: frame.number in {23 24}
+
+#3 [WARNING] TCP Handshake: Handshake not completed: 192.168.1.23:51202 -> 198.51.100.7:22
+    The server answered with 3 SYN-ACK packet(s) but the client never sent the final ACK.
+    Likely cause: the SYN-ACK was dropped on the way back (asymmetric routing or a firewall), or the client gave up / was flooded with half-open connections.
+    Frames: 25, 26, 27, 28
+    Wireshark filter: frame.number in {25 26 27 28}
