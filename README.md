@@ -24,7 +24,7 @@ The tool also avoids common false alarms found on real networks: it tells out-of
 ## Quick start
 
 ```bash
-# 1. Install (Python 3.9+)
+# 1. Install (Python 3.10+)
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
