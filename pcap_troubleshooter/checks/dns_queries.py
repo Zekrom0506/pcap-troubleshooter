@@ -122,6 +122,14 @@ def find_issues(frames, capture_end):
     issues = []
     lookups = collect_lookups(frames)
 
+    # Remember which (name, type) questions got an answer from ANY server.
+    # Computers often ask two DNS servers the same question at once and use
+    # whichever answers first, so one silent server is not always a problem.
+    answered_questions = set()
+    for lookup in lookups:
+        if len(lookup.response_frames) > 0:
+            answered_questions.add((lookup.query_name, lookup.query_type))
+
     for lookup in lookups:
         what = lookup.type_name() + " " + lookup.query_name
 
@@ -137,7 +145,15 @@ def find_issues(frames, capture_end):
                 "Likely cause: the DNS server is down or unreachable, UDP port 53 is blocked,"
                 + " or the client is pointed at the wrong DNS server.",
             ]
-            if query_count == 1 and helpers.near_capture_end(last_query_time, capture_end):
+            question = (lookup.query_name, lookup.query_type)
+            if question in answered_questions:
+                severity = INFO
+                details = [
+                    "The same question was answered by another DNS server,"
+                    + " so name resolution still worked.",
+                    "Server " + lookup.server_ip + " never replied. Worth checking only if this happens a lot.",
+                ]
+            elif query_count == 1 and helpers.near_capture_end(last_query_time, capture_end):
                 severity = INFO
                 details.append("Note: the capture ended just after this query, so the answer may not have been captured.")
 
